@@ -1,9 +1,9 @@
 {
-  "name": "@ng-select/ng-option-highlight",
+  "name": "@marmind/ng-option-highlight",
   "version": "0.0.6",
-  "author": "@ng-select/ng-select",
+  "author": "@marmind/ng-select",
   "license": "MIT",
-  "repository": "ng-select/ng-select",
+  "repository": "marmind/ng-select",
   "peerDependencies": {
     "@angular/common": "<15.0.0",
     "@angular/core": "<15.0.0"

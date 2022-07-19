@@ -363,13 +363,15 @@ export class ItemsList {
         const items = [];
         for (const key of Array.from(groups.keys())) {
             let i = items.length;
-            if (key === undefined) {
-                const withoutGroup = groups.get(undefined) || [];
-                items.push(...withoutGroup.map(x => {
-                    x.index = i++;
-                    return x;
-                }));
-                continue;
+            if(!this._ngSelect.showEmptyGroupHeader) {
+                if (key === undefined) {
+                    const withoutGroup = groups.get(undefined) || [];
+                    items.push(...withoutGroup.map(x => {
+                        x.index = i++;
+                        return x;
+                    }));
+                    continue;
+                }
             }
 
             const isObjectKey = isObject(key);

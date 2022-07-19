@@ -92,6 +92,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     @Input() maxSelectedItems: number;
     @Input() groupBy: string | ((value: any) => any);
     @Input() groupValue: GroupValueFn;
+    @Input() showEmptyGroupHeader: boolean;
     @Input() bufferAmount = 4;
     @Input() virtualScroll: boolean;
     @Input() selectableGroup = false;
@@ -107,8 +108,9 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     @Input() minTermLength = 0;
     @Input() editableSearchTerm = false;
     @Input() keyDownFn = (_: KeyboardEvent) => true;
+    @Input() inputTransform: ((value: string) => string) | undefined;
 
-    @Input() @HostBinding('class.ng-select-typeahead') typeahead: Subject<string>;
+    @Input() @HostBinding('class.ng-select-typeahead') typeahead: Subject<string> | undefined;
     @Input() @HostBinding('class.ng-select-multiple') multiple = false;
     @Input() @HostBinding('class.ng-select-taggable') addTag: boolean | AddTagFn = false;
     @Input() @HostBinding('class.ng-select-searchable') searchable = true;
@@ -154,6 +156,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     @Output('blur') blurEvent = new EventEmitter();
     @Output('focus') focusEvent = new EventEmitter();
     @Output('change') changeEvent = new EventEmitter();
+    @Output('changeValue') changeValueEvent = new EventEmitter();
     @Output('open') openEvent = new EventEmitter();
     @Output('close') closeEvent = new EventEmitter();
     @Output('search') searchEvent = new EventEmitter<{ term: string, items: any[] }>();
@@ -195,6 +198,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     element: HTMLElement;
     focused: boolean;
     escapeHTML = true;
+    classes = '';
 
     private _items = [];
     private _itemsAreUsed: boolean;
@@ -215,6 +219,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     private readonly _keyPress$ = new Subject<string>();
     private _onChange = (_: any) => { };
     private _onTouched = () => { };
+    private _classObserver: MutationObserver;
 
     clearItem = (item: any) => {
         const option = this.selectedItems.find(x => x.value === item);
@@ -222,7 +227,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     };
 
     constructor(
-        @Attribute('class') public classes: string,
+        @Attribute('class') classes: string,
         @Attribute('autofocus') private autoFocus: any,
         public config: NgSelectConfig,
         @Inject(SELECTION_MODEL_FACTORY) newSelectionModel: SelectionModelFactory,
@@ -233,6 +238,19 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
         this._mergeGlobalConfig(config);
         this.itemsList = new ItemsList(this, newSelectionModel());
         this.element = _elementRef.nativeElement;
+        this.classes = classes;
+
+        this._classObserver = new MutationObserver((event: MutationRecord[]) => {
+            this.classes = (event[0].target as HTMLElement).className;
+            _cd.detectChanges();
+        });
+
+        this._classObserver.observe(_elementRef.nativeElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+            childList: false,
+            characterData: false
+        });
     }
 
     get selectedItems(): NgOption[] {
@@ -272,6 +290,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     }
 
     ngAfterViewInit() {
+
         if (!this._itemsAreUsed) {
             this.escapeHTML = false;
             this._setItemsFromNgOptions();
@@ -280,11 +299,13 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
         if (isDefined(this.autoFocus)) {
             this.focus();
         }
+
     }
 
     ngOnDestroy() {
         this._destroy$.next();
         this._destroy$.complete();
+        this._classObserver?.disconnect();
     }
 
     @HostListener('keydown', ['$event'])
@@ -568,6 +589,10 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     }
 
     filter(term: string) {
+        if(this.inputTransform){
+            term = this.inputTransform(term);
+        }
+
         if (this._isComposing && !this.searchWhileComposing) {
             return;
         }
@@ -612,6 +637,13 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
             this._setSearchTermFromItems();
         }
         this.focused = false;
+    }
+
+    onInputKeyPressed($event: KeyboardEvent) {
+        console.log($event);
+        $event.stopPropagation();
+        this.searchTerm = this.searchInput.nativeElement.value.toLocaleUpperCase()
+        return true;
     }
 
     onItemHover(item: NgOption) {
@@ -801,9 +833,11 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
         const selected = this.selectedItems.map(x => x.value);
         if (this.multiple) {
             this._onChange(model);
+            this.changeValueEvent.emit(model);
             this.changeEvent.emit(selected);
         } else {
             this._onChange(isDefined(model[0]) ? model[0] : null);
+            this.changeValueEvent.emit(model[0]);
             this.changeEvent.emit(selected[0]);
         }
 
@@ -939,7 +973,7 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
     }
 
     private get _isTypeahead() {
-        return this.typeahead && this.typeahead.observers.length > 0;
+        return this.typeahead && this.typeahead.observed;
     }
 
     private get _validTerm() {
@@ -962,5 +996,6 @@ export class NgSelectComponent implements OnDestroy, OnChanges, OnInit, AfterVie
         this.bindValue = this.bindValue || config.bindValue;
         this.bindLabel = this.bindLabel || config.bindLabel;
         this.appearance = this.appearance || config.appearance;
+        this.showEmptyGroupHeader = isDefined(this.showEmptyGroupHeader) ? this.showEmptyGroupHeader : config.showEmptyGroupHeader;
     }
 }
